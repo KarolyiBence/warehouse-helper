@@ -436,7 +436,10 @@ function CustomQRScreen({ onBack }) {
   const [code, setCode] = useState(null);
   const [input, setInput] = useState("");
   const [cameraMode, setCameraMode] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState("");
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
   const stopCamera = () => {
@@ -445,11 +448,15 @@ function CustomQRScreen({ onBack }) {
       streamRef.current = null;
     }
     setCameraMode(false);
+    setScanning(false);
+    setScanStatus("");
   };
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
       streamRef.current = stream;
       setCameraMode(true);
       setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
@@ -458,9 +465,51 @@ function CustomQRScreen({ onBack }) {
     }
   };
 
+  const captureAndScan = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    setScanning(true);
+    setScanStatus("Capturing...");
+
+    const v = videoRef.current;
+    const c = canvasRef.current;
+    c.width = v.videoWidth;
+    c.height = v.videoHeight;
+    c.getContext("2d").drawImage(v, 0, 0);
+
+    setScanStatus("Reading text...");
+
+    try {
+      const Tesseract = await import("tesseract.js");
+      const { data } = await Tesseract.default.recognize(c, "eng", {
+        logger: (m) => {
+          if (m.status === "recognizing text") {
+            setScanStatus(`Reading... ${Math.round((m.progress || 0) * 100)}%`);
+          }
+        },
+      });
+
+      const raw = data.text.trim();
+      // Clean up: keep letters, numbers, and dashes, try to find location-code-like patterns
+      const cleaned = raw.replace(/[^A-Za-z0-9\-\s]/g, "").trim().toUpperCase();
+
+      if (cleaned.length > 0) {
+        // Try to find the most code-like segment (contains dashes)
+        const segments = cleaned.split(/\s+/);
+        const codeLike = segments.find(s => s.includes("-") && s.length >= 3) || segments[0] || cleaned;
+        setInput(codeLike);
+        setScanStatus("Text found — edit if needed, then tap →");
+      } else {
+        setScanStatus("No text found. Try again or type manually.");
+      }
+    } catch (err) {
+      setScanStatus("Scan failed. Try again or type manually.");
+    }
+    setScanning(false);
+  };
+
   const generateCode = () => {
     const val = input.trim().toUpperCase();
-    if (val) { setCode(val); setInput(""); }
+    if (val) { setCode(val); setInput(""); stopCamera(); }
   };
 
   useEffect(() => {
@@ -478,17 +527,64 @@ function CustomQRScreen({ onBack }) {
           </div>
         )}
         {cameraMode ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-            <div style={{ fontSize: 12, color: "#26A69A", fontFamily: font, fontWeight: 700, letterSpacing: 1, textAlign: "center" }}>
-              READ THE LABEL, THEN TYPE IT BELOW
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <div style={{
+              fontSize: 12, color: "#26A69A", fontFamily: font,
+              fontWeight: 700, letterSpacing: 1, textAlign: "center",
+            }}>POINT AT LABEL, TAP SCAN</div>
+
+            <div style={{ position: "relative", width: "100%", maxWidth: 360 }}>
+              <video ref={videoRef} autoPlay playsInline style={{
+                width: "100%", borderRadius: 14, border: `2px solid #26A69A40`, display: "block",
+              }} />
+              {/* Scan target overlay */}
+              <div style={{
+                position: "absolute", top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "80%", height: 50, border: "2px dashed #26A69A88",
+                borderRadius: 8, pointerEvents: "none",
+              }} />
             </div>
-            <video ref={videoRef} autoPlay playsInline style={{
-              width: "100%", maxWidth: 360, borderRadius: 14, border: `2px solid #26A69A40`,
-            }} />
-            <button onClick={stopCamera} style={{
-              padding: "18px 30px", background: C.surface, border: `2px solid ${C.border}`,
-              borderRadius: 14, fontFamily: font, fontWeight: 700, fontSize: 15, color: C.text, cursor: "pointer", width: "100%",
-            }}>CLOSE CAMERA</button>
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+
+            {scanStatus && (
+              <div style={{
+                fontFamily: font, fontSize: 12, color: scanning ? "#FFA726" : "#26A69A",
+                textAlign: "center", fontWeight: 600,
+              }}>{scanStatus}</div>
+            )}
+
+            {/* Input field visible during camera mode for editing OCR result */}
+            <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 360 }}>
+              <input value={input} onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && generateCode()}
+                placeholder="Scanned text appears here..."
+                style={{
+                  flex: 1, padding: "16px", background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 12, color: C.text, fontSize: 16, fontFamily: font, outline: "none", letterSpacing: 1,
+                }} />
+              <button onClick={generateCode} disabled={!input.trim()} style={{
+                width: 60, background: input.trim() ? "#26A69A25" : C.surface,
+                border: `2px solid ${input.trim() ? "#26A69A50" : C.border}`,
+                borderRadius: 12, color: input.trim() ? "#26A69A" : C.textDim,
+                fontWeight: 800, fontSize: 22, cursor: input.trim() ? "pointer" : "default", fontFamily: font,
+              }}>→</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 360 }}>
+              <button onClick={captureAndScan} disabled={scanning} style={{
+                flex: 1, padding: "20px", background: scanning ? C.surface : "#26A69A20",
+                border: `2px solid ${scanning ? C.border : "#26A69A50"}`,
+                borderRadius: 14, fontFamily: font, fontWeight: 800, fontSize: 16,
+                color: scanning ? C.textDim : "#26A69A", cursor: scanning ? "default" : "pointer",
+                letterSpacing: 1,
+              }}>{scanning ? "SCANNING..." : "◎ SCAN TEXT"}</button>
+              <button onClick={stopCamera} style={{
+                padding: "20px", background: C.surface, border: `2px solid ${C.border}`,
+                borderRadius: 14, fontFamily: font, fontWeight: 700, fontSize: 16,
+                color: C.text, cursor: "pointer", minWidth: 80,
+              }}>✕</button>
+            </div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -496,8 +592,8 @@ function CustomQRScreen({ onBack }) {
               width: "100%", padding: "24px", background: "#26A69A15",
               border: `2px solid #26A69A40`, borderRadius: 14, cursor: "pointer",
               fontFamily: font, fontWeight: 800, fontSize: 17, color: "#26A69A", letterSpacing: 1,
-            }}>◎ OPEN CAMERA</button>
-            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, fontFamily: font, fontWeight: 700, marginTop: 8 }}>TYPE LOCATION CODE</div>
+            }}>◎ OPEN CAMERA & SCAN</button>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, fontFamily: font, fontWeight: 700, marginTop: 8 }}>OR TYPE LOCATION CODE</div>
             <div style={{ display: "flex", gap: 10 }}>
               <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && generateCode()}
                 placeholder="e.g. CH-C-100-01-1" style={{
