@@ -1,0 +1,548 @@
+import { useState, useRef, useEffect } from "react";
+import { QRCodeSVG } from "qrcode.react";
+
+/* ─── CONFIG (easy to extend) ─── */
+const DOCK_PREFIXES = ["D", "V"];
+const DOCK_NUMBERS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+const MAX_FRAMES = 10;
+
+const KEYWORDS = ["UNKNOWN", "CONSOLIDATION"];
+
+const PALLET_DATA = [
+  { name: "CHEP", color: "#2979FF", colorName: "Blue", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Blue painted wood", "CHEP logo branded on blocks", "Block pallet with 4-way entry", "Most common pooled pallet"] },
+  { name: "LPR", color: "#FF1744", colorName: "Bright Red", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Bright red painted wood", "LPR / La Palette Rouge logo", "Block pallet", "European pool system"] },
+  { name: "IPP", color: "#8B0000", colorName: "Dark Red", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Dark red / maroon painted wood", "IPP Logipal branding", "Block pallet", "Darker than LPR"] },
+  { name: "EPS", color: "#8D6E3F", colorName: "Brown Wood", type: "Block", dims: "Various", material: "Wood", markers: ["Natural brown wood", "EPS stamp on blocks", "Unpainted / natural color", "Block style"] },
+  { name: "DPB", color: "#1a1a1a", colorName: "Black Plastic", type: "Block", dims: "Various", material: "Plastic", markers: ["Black plastic", "Lightweight", "Block pallet style", "Durable / washable"] },
+  { name: "BLOCK", color: "#546E7A", colorName: "Various", type: "Block", dims: "Various", material: "Wood", markers: ["Blocks at corners + center", "4-way forklift entry", "Heavier & stronger", "9 blocks total"] },
+  { name: "EURO", color: "#C8A85C", colorName: "Natural Wood", type: "EPAL", dims: "1200×800mm", material: "Wood", markers: ["EPAL/EUR stamp required", "Chamfered edges on blocks", "Narrower than standard (800mm)", "Most common in Europe"] },
+];
+
+/* ─── FRAME CODES GENERATOR ─── */
+function getFrameCodes(dept) {
+  const codes = [];
+  const start = dept === "CH" ? 1 : 2;
+  for (let i = 0; i < MAX_FRAMES; i++) {
+    const num = start + i * 2;
+    codes.push(String(num).padStart(2, "0"));
+  }
+  return codes;
+}
+
+/* ─── STYLES ─── */
+const C = {
+  bg: "#0a0a12",
+  surface: "#13131f",
+  border: "#1e1e30",
+  amber: "#FFAB00",
+  chilled: "#42A5F5",
+  chilledDim: "rgba(66,165,245,0.12)",
+  chilledBorder: "rgba(66,165,245,0.25)",
+  ambient: "#FF7043",
+  ambientDim: "rgba(255,112,67,0.12)",
+  ambientBorder: "rgba(255,112,67,0.25)",
+  text: "#e0e0e0",
+  textDim: "#666",
+};
+
+const font = "'IBM Plex Mono', 'Courier New', monospace";
+
+/* ─── PALLET SVG ILLUSTRATION ─── */
+function PalletIllustration({ color, material, size = 90 }) {
+  const isPlastic = material === "Plastic";
+  const boardColor = color === "#1a1a1a" ? "#222" : color;
+  const highlight = color === "#1a1a1a" ? "#333" : `${color}cc`;
+  const shadow = color === "#1a1a1a" ? "#111" : `${color}88`;
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+      <rect x="5" y="15" width="90" height="8" rx="1.5" fill={boardColor} />
+      <rect x="5" y="15" width="90" height="3" rx="1" fill={highlight} opacity="0.3" />
+      <rect x="5" y="26" width="90" height="8" rx="1.5" fill={boardColor} />
+      <rect x="5" y="37" width="90" height="8" rx="1.5" fill={boardColor} />
+      <rect x="5" y="37" width="90" height="3" rx="1" fill={highlight} opacity="0.2" />
+      <rect x="5" y="48" width="90" height="8" rx="1.5" fill={boardColor} />
+      <rect x="5" y="59" width="90" height="8" rx="1.5" fill={boardColor} />
+      <rect x="5" y="59" width="90" height="3" rx="1" fill={highlight} opacity="0.3" />
+      <rect x="8" y="72" width="18" height="18" rx="2" fill={shadow} />
+      <rect x="41" y="72" width="18" height="18" rx="2" fill={shadow} />
+      <rect x="74" y="72" width="18" height="18" rx="2" fill={shadow} />
+      <rect x="8" y="72" width="18" height="6" rx="1.5" fill={highlight} opacity="0.25" />
+      <rect x="41" y="72" width="18" height="6" rx="1.5" fill={highlight} opacity="0.25" />
+      <rect x="74" y="72" width="18" height="6" rx="1.5" fill={highlight} opacity="0.25" />
+      {!isPlastic && (
+        <>
+          <line x1="20" y1="17" x2="20" y2="22" stroke={shadow} strokeWidth="0.5" opacity="0.4" />
+          <line x1="50" y1="28" x2="50" y2="33" stroke={shadow} strokeWidth="0.5" opacity="0.4" />
+          <line x1="70" y1="39" x2="70" y2="44" stroke={shadow} strokeWidth="0.5" opacity="0.4" />
+          <line x1="35" y1="50" x2="35" y2="55" stroke={shadow} strokeWidth="0.5" opacity="0.4" />
+          <line x1="60" y1="61" x2="60" y2="66" stroke={shadow} strokeWidth="0.5" opacity="0.4" />
+        </>
+      )}
+      {isPlastic && (
+        <>
+          <circle cx="25" cy="30" r="2" fill="#0a0a12" opacity="0.5" />
+          <circle cx="50" cy="30" r="2" fill="#0a0a12" opacity="0.5" />
+          <circle cx="75" cy="30" r="2" fill="#0a0a12" opacity="0.5" />
+          <circle cx="25" cy="52" r="2" fill="#0a0a12" opacity="0.5" />
+          <circle cx="50" cy="52" r="2" fill="#0a0a12" opacity="0.5" />
+          <circle cx="75" cy="52" r="2" fill="#0a0a12" opacity="0.5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/* ─── SHARED COMPONENTS ─── */
+
+function BigButton({ label, sub, color, onClick, icon }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%", padding: "28px 20px",
+        background: `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`,
+        border: `2px solid ${color}40`,
+        borderRadius: 16, cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 18,
+        transition: "all 0.15s",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      <div style={{
+        width: 56, height: 56, borderRadius: 14,
+        background: `${color}25`, display: "flex",
+        alignItems: "center", justifyContent: "center",
+        fontSize: 26, flexShrink: 0,
+      }}>{icon}</div>
+      <div style={{ textAlign: "left" }}>
+        <div style={{
+          fontFamily: font, fontWeight: 700, fontSize: 18,
+          color: C.text, letterSpacing: 0.5,
+        }}>{label}</div>
+        <div style={{
+          fontFamily: font, fontSize: 12, color: C.textDim,
+          marginTop: 3,
+        }}>{sub}</div>
+      </div>
+    </button>
+  );
+}
+
+function BackBar({ onBack, title, accent = C.amber }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "16px 20px", borderBottom: `1px solid ${C.border}`,
+    }}>
+      <button
+        onClick={onBack}
+        style={{
+          width: 52, height: 52, borderRadius: 14,
+          background: C.surface, border: `1px solid ${C.border}`,
+          color: C.text, fontSize: 22, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: font, flexShrink: 0,
+        }}
+      >←</button>
+      <div style={{
+        fontFamily: font, fontWeight: 700, fontSize: 16,
+        color: accent, letterSpacing: 1,
+      }}>{title}</div>
+    </div>
+  );
+}
+
+function QRDisplay({ code, large = false }) {
+  const qrSize = large ? 260 : 200;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      alignItems: "center", gap: 16,
+    }}>
+      <div style={{
+        background: "#111118", borderRadius: 16,
+        padding: 16, border: `1px solid ${C.border}`,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <QRCodeSVG
+          value={code}
+          size={qrSize}
+          bgColor="#111118"
+          fgColor="#e0e0e0"
+          level="M"
+        />
+      </div>
+      <div style={{
+        fontFamily: font, fontWeight: 800,
+        fontSize: large ? 28 : 22,
+        color: C.amber, letterSpacing: 2,
+        textAlign: "center",
+      }}>{code}</div>
+    </div>
+  );
+}
+
+/* ─── SCREENS ─── */
+
+function HomeScreen({ onNavigate }) {
+  return (
+    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ textAlign: "center", padding: "30px 0 20px" }}>
+        <div style={{
+          fontSize: 10, color: C.amber, letterSpacing: 5,
+          fontFamily: font, fontWeight: 700, marginBottom: 8,
+        }}>⬡ WAREHOUSE</div>
+        <div style={{
+          fontSize: 30, fontWeight: 800, fontFamily: font,
+          color: C.text, letterSpacing: -0.5,
+        }}>FLOOR HELPER</div>
+      </div>
+      <BigButton label="DOCK QR CODES" sub="Swipe through dock frame codes" color={C.amber} icon="▦" onClick={() => onNavigate("dock-dept")} />
+      <BigButton label="QUICK KEYWORDS" sub="UNKNOWN · CONSOLIDATION" color="#AB47BC" icon="⚡" onClick={() => onNavigate("keywords")} />
+      <BigButton label="CUSTOM QR" sub="Scan location label → QR code" color="#26A69A" icon="◎" onClick={() => onNavigate("custom")} />
+      <BigButton label="PALLET GUIDE" sub="CHEP · IPP · LPR · EPS · DPB" color="#5C6BC0" icon="▤" onClick={() => onNavigate("pallets")} />
+    </div>
+  );
+}
+
+function DockDeptScreen({ onBack, onSelect }) {
+  return (
+    <div>
+      <BackBar onBack={onBack} title="SELECT DEPARTMENT" />
+      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <button onClick={() => onSelect("CH")} style={{
+          width: "100%", padding: "36px 20px",
+          background: C.chilledDim, border: `2px solid ${C.chilledBorder}`,
+          borderRadius: 16, cursor: "pointer",
+          fontFamily: font, fontWeight: 800, fontSize: 24, color: C.chilled, letterSpacing: 2,
+        }}>
+          ❄ CHILLED
+          <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, opacity: 0.6 }}>Odd frames: -01, -03, -05...</div>
+        </button>
+        <button onClick={() => onSelect("AM")} style={{
+          width: "100%", padding: "36px 20px",
+          background: C.ambientDim, border: `2px solid ${C.ambientBorder}`,
+          borderRadius: 16, cursor: "pointer",
+          fontFamily: font, fontWeight: 800, fontSize: 24, color: C.ambient, letterSpacing: 2,
+        }}>
+          ☀ AMBIENT
+          <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, opacity: 0.6 }}>Even frames: -02, -04, -06...</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DockSelectScreen({ onBack, dept, onSelect }) {
+  const accent = dept === "CH" ? C.chilled : C.ambient;
+  return (
+    <div>
+      <BackBar onBack={onBack} title={`${dept === "CH" ? "❄ CHILLED" : "☀ AMBIENT"} — SELECT DOCK`} accent={accent} />
+      <div style={{ padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {DOCK_PREFIXES.flatMap(prefix =>
+          DOCK_NUMBERS.map(num => {
+            const dock = `${prefix}-${num}`;
+            return (
+              <button key={dock} onClick={() => onSelect(dock)} style={{
+                padding: "24px 10px", background: C.surface,
+                border: `2px solid ${C.border}`, borderRadius: 14, cursor: "pointer",
+                fontFamily: font, fontWeight: 800, fontSize: 20, color: C.text, letterSpacing: 1,
+              }}>{dock}</button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DockSwiperScreen({ onBack, dept, dock }) {
+  const frames = getFrameCodes(dept);
+  const [idx, setIdx] = useState(0);
+  const accent = dept === "CH" ? C.chilled : C.ambient;
+  const code = `${dock}-${frames[idx]}`;
+  const touchStartX = useRef(null);
+
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const next = () => setIdx(i => Math.min(frames.length - 1, i + 1));
+
+  return (
+    <div>
+      <BackBar onBack={onBack} title={`${dept === "CH" ? "❄" : "☀"} ${dock}`} accent={accent} />
+      <div
+        style={{
+          padding: "30px 20px", display: "flex", flexDirection: "column",
+          alignItems: "center", gap: 24, minHeight: "60vh", justifyContent: "center",
+          userSelect: "none", touchAction: "pan-y",
+        }}
+        onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (touchStartX.current === null) return;
+          const diff = e.changedTouches[0].clientX - touchStartX.current;
+          if (Math.abs(diff) > 50) { if (diff < 0) next(); else prev(); }
+          touchStartX.current = null;
+        }}
+      >
+        <div style={{ fontFamily: font, fontSize: 13, color: C.textDim, letterSpacing: 2 }}>
+          FRAME {idx + 1} / {frames.length}
+        </div>
+        <QRDisplay code={code} large />
+        <div style={{ display: "flex", gap: 6 }}>
+          {frames.map((_, i) => (
+            <div key={i} style={{
+              width: i === idx ? 24 : 8, height: 8, borderRadius: 4,
+              background: i === idx ? accent : `${accent}30`, transition: "all 0.2s",
+            }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 360 }}>
+          <button onClick={prev} disabled={idx === 0} style={{
+            flex: 1, padding: "22px 0",
+            background: idx === 0 ? C.surface : `${accent}18`,
+            border: `2px solid ${idx === 0 ? C.border : `${accent}40`}`,
+            borderRadius: 14, cursor: idx === 0 ? "default" : "pointer",
+            fontFamily: font, fontWeight: 800, fontSize: 20,
+            color: idx === 0 ? C.textDim : accent, opacity: idx === 0 ? 0.4 : 1,
+          }}>← PREV</button>
+          <button onClick={next} disabled={idx === frames.length - 1} style={{
+            flex: 1, padding: "22px 0",
+            background: idx === frames.length - 1 ? C.surface : `${accent}18`,
+            border: `2px solid ${idx === frames.length - 1 ? C.border : `${accent}40`}`,
+            borderRadius: 14, cursor: idx === frames.length - 1 ? "default" : "pointer",
+            fontFamily: font, fontWeight: 800, fontSize: 20,
+            color: idx === frames.length - 1 ? C.textDim : accent, opacity: idx === frames.length - 1 ? 0.4 : 1,
+          }}>NEXT →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeywordsScreen({ onBack }) {
+  const [active, setActive] = useState(null);
+  const [customs, setCustoms] = useState([]);
+  const [input, setInput] = useState("");
+  const allKeywords = [...KEYWORDS, ...customs];
+
+  const addCustom = () => {
+    const val = input.trim().toUpperCase();
+    if (val && !allKeywords.includes(val)) {
+      setCustoms(prev => [...prev, val]);
+      setInput("");
+    }
+  };
+
+  return (
+    <div>
+      <BackBar onBack={onBack} title="QUICK KEYWORDS" accent="#AB47BC" />
+      <div style={{ padding: 20 }}>
+        {active !== null ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "20px 0" }}>
+            <QRDisplay code={active} large />
+            <button onClick={() => setActive(null)} style={{
+              padding: "18px 40px", background: C.surface,
+              border: `2px solid ${C.border}`, borderRadius: 14,
+              fontFamily: font, fontWeight: 700, fontSize: 16,
+              color: C.text, cursor: "pointer", width: "100%",
+            }}>← BACK TO LIST</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              {allKeywords.map((kw) => (
+                <button key={kw} onClick={() => setActive(kw)} style={{
+                  width: "100%", padding: "24px 20px", background: C.surface,
+                  border: `2px solid #AB47BC40`, borderRadius: 14, cursor: "pointer",
+                  fontFamily: font, fontWeight: 800, fontSize: 20,
+                  color: "#CE93D8", letterSpacing: 2, textAlign: "left",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  {kw}
+                  <span style={{ fontSize: 14, opacity: 0.4 }}>→</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, fontFamily: font, fontWeight: 700, marginBottom: 10 }}>ADD CUSTOM KEYWORD</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addCustom()}
+                placeholder="Type keyword..." style={{
+                  flex: 1, padding: "16px", background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 12, color: C.text, fontSize: 16, fontFamily: font, outline: "none",
+                }} />
+              <button onClick={addCustom} style={{
+                width: 60, background: "#AB47BC30", border: `2px solid #AB47BC50`,
+                borderRadius: 12, color: "#CE93D8", fontWeight: 800, fontSize: 22, cursor: "pointer", fontFamily: font,
+              }}>+</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CustomQRScreen({ onBack }) {
+  const [code, setCode] = useState(null);
+  const [input, setInput] = useState("");
+  const [cameraMode, setCameraMode] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setCameraMode(false);
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      setCameraMode(true);
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
+    } catch (err) {
+      alert("Camera access denied. Use manual input instead.");
+    }
+  };
+
+  const generateCode = () => {
+    const val = input.trim().toUpperCase();
+    if (val) { setCode(val); setInput(""); }
+  };
+
+  useEffect(() => {
+    return () => { if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  return (
+    <div>
+      <BackBar onBack={() => { stopCamera(); onBack(); }} title="CUSTOM QR" accent="#26A69A" />
+      <div style={{ padding: 20 }}>
+        {code && !cameraMode && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginBottom: 30, padding: "20px 0" }}>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 3, fontFamily: font, fontWeight: 700 }}>CURRENT QR CODE</div>
+            <QRDisplay code={code} large />
+          </div>
+        )}
+        {cameraMode ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 12, color: "#26A69A", fontFamily: font, fontWeight: 700, letterSpacing: 1, textAlign: "center" }}>
+              READ THE LABEL, THEN TYPE IT BELOW
+            </div>
+            <video ref={videoRef} autoPlay playsInline style={{
+              width: "100%", maxWidth: 360, borderRadius: 14, border: `2px solid #26A69A40`,
+            }} />
+            <button onClick={stopCamera} style={{
+              padding: "18px 30px", background: C.surface, border: `2px solid ${C.border}`,
+              borderRadius: 14, fontFamily: font, fontWeight: 700, fontSize: 15, color: C.text, cursor: "pointer", width: "100%",
+            }}>CLOSE CAMERA</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <button onClick={startCamera} style={{
+              width: "100%", padding: "24px", background: "#26A69A15",
+              border: `2px solid #26A69A40`, borderRadius: 14, cursor: "pointer",
+              fontFamily: font, fontWeight: 800, fontSize: 17, color: "#26A69A", letterSpacing: 1,
+            }}>◎ OPEN CAMERA</button>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, fontFamily: font, fontWeight: 700, marginTop: 8 }}>TYPE LOCATION CODE</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && generateCode()}
+                placeholder="e.g. CH-C-100-01-1" style={{
+                  flex: 1, padding: "18px 16px", background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 12, color: C.text, fontSize: 18, fontFamily: font, outline: "none", letterSpacing: 1,
+                }} />
+              <button onClick={generateCode} style={{
+                width: 70, background: "#26A69A25", border: `2px solid #26A69A50`,
+                borderRadius: 12, color: "#26A69A", fontWeight: 800, fontSize: 22, cursor: "pointer", fontFamily: font,
+              }}>→</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PalletScreen({ onBack }) {
+  const [expanded, setExpanded] = useState(null);
+  return (
+    <div>
+      <BackBar onBack={onBack} title="PALLET GUIDE" accent="#5C6BC0" />
+      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        {PALLET_DATA.map((p, i) => (
+          <button key={p.name} onClick={() => setExpanded(expanded === i ? null : i)} style={{
+            width: "100%", padding: "18px 16px", background: C.surface,
+            border: `1px solid ${C.border}`, borderLeft: `5px solid ${p.color === "#1a1a1a" ? "#444" : p.color}`,
+            borderRadius: 14, cursor: "pointer", textAlign: "left",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 12,
+                background: `${p.color === "#1a1a1a" ? "#222" : p.color}18`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, overflow: "hidden",
+              }}>
+                <PalletIllustration color={p.color} material={p.material} size={52} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: font, fontWeight: 700, fontSize: 17, color: C.text }}>{p.name}</div>
+                <div style={{ fontFamily: font, fontSize: 12, color: C.textDim, marginTop: 2 }}>{p.colorName} · {p.type} · {p.dims}</div>
+              </div>
+              <div style={{
+                color: C.textDim, fontSize: 20,
+                transform: expanded === i ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s",
+              }}>▾</div>
+            </div>
+            {expanded === i && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, padding: "10px 0",
+                  background: `${p.color === "#1a1a1a" ? "#181818" : p.color}08`, borderRadius: 12 }}>
+                  <PalletIllustration color={p.color} material={p.material} size={120} />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {p.markers.map((m, j) => (
+                    <span key={j} style={{
+                      background: `${p.color === "#1a1a1a" ? "#333" : p.color}15`,
+                      border: `1px solid ${p.color === "#1a1a1a" ? "#444" : p.color}35`,
+                      color: p.color === "#1a1a1a" ? "#999" : p.color,
+                      borderRadius: 8, padding: "6px 14px", fontSize: 13, fontFamily: font, fontWeight: 600,
+                    }}>{m}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── APP ─── */
+export default function App() {
+  const [screen, setScreen] = useState("home");
+  const [dept, setDept] = useState(null);
+  const [dock, setDock] = useState(null);
+
+  const navigate = (s) => setScreen(s);
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: C.bg,
+      maxWidth: 480, margin: "0 auto", paddingBottom: 40, overflowX: "hidden",
+    }}>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+      {screen === "home" && <HomeScreen onNavigate={navigate} />}
+      {screen === "dock-dept" && <DockDeptScreen onBack={() => navigate("home")} onSelect={(d) => { setDept(d); navigate("dock-select"); }} />}
+      {screen === "dock-select" && <DockSelectScreen onBack={() => navigate("dock-dept")} dept={dept} onSelect={(d) => { setDock(d); navigate("dock-swiper"); }} />}
+      {screen === "dock-swiper" && <DockSwiperScreen onBack={() => navigate("dock-select")} dept={dept} dock={dock} />}
+      {screen === "keywords" && <KeywordsScreen onBack={() => navigate("home")} />}
+      {screen === "custom" && <CustomQRScreen onBack={() => navigate("home")} />}
+      {screen === "pallets" && <PalletScreen onBack={() => navigate("home")} />}
+    </div>
+  );
+}
