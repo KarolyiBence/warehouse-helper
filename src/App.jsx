@@ -527,26 +527,41 @@ function CustomQRScreen({ onBack }) {
           </div>
         )}
         {cameraMode ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            <div style={{
-              fontSize: 12, color: "#26A69A", fontFamily: font,
-              fontWeight: 700, letterSpacing: 1, textAlign: "center",
-            }}>POINT AT LABEL, TAP SCAN</div>
-
-            <div style={{ position: "relative", width: "100%", maxWidth: 360 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Compact video preview */}
+            <div style={{ position: "relative", width: "100%", height: 160, borderRadius: 14, overflow: "hidden", border: `2px solid #26A69A40` }}>
               <video ref={videoRef} autoPlay playsInline style={{
-                width: "100%", borderRadius: 14, border: `2px solid #26A69A40`, display: "block",
+                width: "100%", height: "100%", objectFit: "cover", display: "block",
               }} />
               {/* Scan target overlay */}
               <div style={{
                 position: "absolute", top: "50%", left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: "80%", height: 50, border: "2px dashed #26A69A88",
-                borderRadius: 8, pointerEvents: "none",
+                width: "80%", height: 40, border: "2px dashed #26A69Acc",
+                borderRadius: 6, pointerEvents: "none",
               }} />
+              {/* Close button overlaid on video */}
+              <button onClick={stopCamera} style={{
+                position: "absolute", top: 8, right: 8,
+                width: 36, height: 36, borderRadius: 10,
+                background: "rgba(0,0,0,0.6)", border: "none",
+                color: "#fff", fontSize: 18, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: font,
+              }}>✕</button>
             </div>
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
+            {/* Scan button */}
+            <button onClick={captureAndScan} disabled={scanning} style={{
+              width: "100%", padding: "18px", background: scanning ? C.surface : "#26A69A20",
+              border: `2px solid ${scanning ? C.border : "#26A69A50"}`,
+              borderRadius: 14, fontFamily: font, fontWeight: 800, fontSize: 16,
+              color: scanning ? C.textDim : "#26A69A", cursor: scanning ? "default" : "pointer",
+              letterSpacing: 1,
+            }}>{scanning ? "SCANNING..." : "◎ SCAN TEXT"}</button>
+
+            {/* Status */}
             {scanStatus && (
               <div style={{
                 fontFamily: font, fontSize: 12, color: scanning ? "#FFA726" : "#26A69A",
@@ -554,8 +569,8 @@ function CustomQRScreen({ onBack }) {
               }}>{scanStatus}</div>
             )}
 
-            {/* Input field visible during camera mode for editing OCR result */}
-            <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 360 }}>
+            {/* Input + confirm */}
+            <div style={{ display: "flex", gap: 10 }}>
               <input value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && generateCode()}
                 placeholder="Scanned text appears here..."
@@ -569,21 +584,6 @@ function CustomQRScreen({ onBack }) {
                 borderRadius: 12, color: input.trim() ? "#26A69A" : C.textDim,
                 fontWeight: 800, fontSize: 22, cursor: input.trim() ? "pointer" : "default", fontFamily: font,
               }}>→</button>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 360 }}>
-              <button onClick={captureAndScan} disabled={scanning} style={{
-                flex: 1, padding: "20px", background: scanning ? C.surface : "#26A69A20",
-                border: `2px solid ${scanning ? C.border : "#26A69A50"}`,
-                borderRadius: 14, fontFamily: font, fontWeight: 800, fontSize: 16,
-                color: scanning ? C.textDim : "#26A69A", cursor: scanning ? "default" : "pointer",
-                letterSpacing: 1,
-              }}>{scanning ? "SCANNING..." : "◎ SCAN TEXT"}</button>
-              <button onClick={stopCamera} style={{
-                padding: "20px", background: C.surface, border: `2px solid ${C.border}`,
-                borderRadius: 14, fontFamily: font, fontWeight: 700, fontSize: 16,
-                color: C.text, cursor: "pointer", minWidth: 80,
-              }}>✕</button>
             </div>
           </div>
         ) : (
