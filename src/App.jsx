@@ -529,7 +529,7 @@ function CustomQRScreen({ onBack }) {
         {cameraMode ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {/* Compact video preview */}
-            <div style={{ position: "relative", width: "100%", height: 160, borderRadius: 14, overflow: "hidden", border: `2px solid #26A69A40` }}>
+            <div style={{ position: "relative", width: "100%", height: 280, borderRadius: 14, overflow: "hidden", border: `2px solid #26A69A40` }}>
               <video ref={videoRef} autoPlay playsInline style={{
                 width: "100%", height: "100%", objectFit: "cover", display: "block",
               }} />
