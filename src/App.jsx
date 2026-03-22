@@ -537,7 +537,7 @@ function CustomQRScreen({ onBack }) {
               <div style={{
                 position: "absolute", top: "50%", left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: "80%", height: 40, border: "2px dashed #26A69Acc",
+                width: "90%", height: 80, border: "2px dashed #26A69Acc",
                 borderRadius: 6, pointerEvents: "none",
               }} />
               {/* Close button overlaid on video */}
