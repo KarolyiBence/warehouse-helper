@@ -488,23 +488,121 @@ function CustomQRScreen({ onBack }) {
         },
       });
 
-      const raw = data.text.trim();
-      // Clean up: keep letters, numbers, and dashes, try to find location-code-like patterns
-      const cleaned = raw.replace(/[^A-Za-z0-9\-\s]/g, "").trim().toUpperCase();
+      const raw = data.text.trim().toUpperCase();
 
-      if (cleaned.length > 0) {
-        // Try to find the most code-like segment (contains dashes)
-        const segments = cleaned.split(/\s+/);
-        const codeLike = segments.find(s => s.includes("-") && s.length >= 3) || segments[0] || cleaned;
-        setInput(codeLike);
-        setScanStatus("Text found — edit if needed, then tap →");
+      // Try to extract a valid location code from noisy OCR output
+      const result = extractLocationCode(raw);
+
+      if (result) {
+        setInput(result);
+        setScanStatus("Code found — edit if needed, then tap →");
       } else {
-        setScanStatus("No text found. Try again or type manually.");
+        // Fallback: show best cleaned text
+        const cleaned = raw.replace(/[^A-Za-z0-9\-\s]/g, "").trim();
+        if (cleaned.length > 0) {
+          const segments = cleaned.split(/\s+/);
+          const codeLike = segments.find(s => s.includes("-") && s.length >= 3) || segments[0] || cleaned;
+          setInput(codeLike);
+          setScanStatus("No exact match — edit the code, then tap →");
+        } else {
+          setScanStatus("No text found. Try again or type manually.");
+        }
       }
     } catch (err) {
       setScanStatus("Scan failed. Try again or type manually.");
     }
     setScanning(false);
+  };
+
+  // Smart location code extractor
+  const extractLocationCode = (raw) => {
+    // Common OCR character corrections
+    const fixDigits = (s) => s.replace(/O/g, "0").replace(/I/g, "1").replace(/l/g, "1").replace(/S/g, "5").replace(/B/g, "8").replace(/Z/g, "2").replace(/G/g, "6");
+    const fixLetters = (s) => s.replace(/0/g, "O").replace(/1/g, "I").replace(/5/g, "S").replace(/8/g, "B");
+
+    // Valid values for each section
+    const validPrefixes = ["AM", "CH", "FR"];
+    const validAisles = ["A", "B", "C", "D", "E", "F"];
+
+    // Method 1: Try to match the full pattern directly (with flexible separators)
+    // Pattern: (AM|CH|FR) - (A-F) - (3 digits) - (2 digits) - (1-2 digits)
+    const fullPattern = /(?:^|[\s,;])?(AM|CH|FR)[\s\-_.]*([A-F])[\s\-_.]*(\d{2,3})[\s\-_.]*(\d{1,2})[\s\-_.]*(\d{1,2})(?:[\s,;]|$)/;
+    const directMatch = raw.match(fullPattern);
+    if (directMatch) {
+      const [, prefix, aisle, rack, shelf, pos] = directMatch;
+      const rackPad = rack.padStart(3, "0");
+      const shelfPad = shelf.padStart(2, "0");
+      return `${prefix}-${aisle}-${rackPad}-${shelfPad}-${pos}`;
+    }
+
+    // Method 2: Clean the string and try to find fragments
+    const cleaned = raw.replace(/[^A-Z0-9\-\s]/g, " ").replace(/\s+/g, " ").trim();
+    const tokens = cleaned.split(/[\s\-]+/);
+
+    let prefix = null, aisle = null, rack = null, shelf = null, pos = null;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+
+      // Find prefix
+      if (!prefix) {
+        if (validPrefixes.includes(t)) { prefix = t; continue; }
+        // OCR might read "CH" as "C H" or "0H" etc
+        const fixedT = t.replace(/0/g, "O");
+        if (validPrefixes.includes(fixedT)) { prefix = fixedT; continue; }
+      }
+
+      // Find aisle (single letter A-F)
+      if (prefix && !aisle) {
+        if (t.length === 1 && validAisles.includes(t)) { aisle = t; continue; }
+      }
+
+      // Find rack (3-digit number)
+      if (aisle && !rack) {
+        const digits = fixDigits(t);
+        if (/^\d{1,3}$/.test(digits)) { rack = digits.padStart(3, "0"); continue; }
+      }
+
+      // Find shelf (2-digit number)
+      if (rack && !shelf) {
+        const digits = fixDigits(t);
+        if (/^\d{1,2}$/.test(digits)) { shelf = digits.padStart(2, "0"); continue; }
+      }
+
+      // Find position (1-2 digit number, 1-14)
+      if (shelf && !pos) {
+        const digits = fixDigits(t);
+        if (/^\d{1,2}$/.test(digits)) {
+          const num = parseInt(digits, 10);
+          if (num >= 1 && num <= 14) { pos = String(num); continue; }
+        }
+      }
+    }
+
+    if (prefix && aisle && rack && shelf && pos) {
+      return `${prefix}-${aisle}-${rack}-${shelf}-${pos}`;
+    }
+
+    // Method 3: Try extracting all digits and letters from the whole string
+    // and see if we can reconstruct the code
+    const allChars = cleaned.replace(/[\s\-]/g, "");
+    for (const pfx of validPrefixes) {
+      const pfxIdx = allChars.indexOf(pfx);
+      if (pfxIdx === -1) continue;
+
+      const after = allChars.slice(pfxIdx + pfx.length);
+      // Expect: 1 letter + 3 digits + 2 digits + 1-2 digits
+      const reassemble = after.match(/^([A-F])(\d{3})(\d{2})(\d{1,2})/);
+      if (reassemble) {
+        const [, a, r, s, p] = reassemble;
+        const pNum = parseInt(p, 10);
+        if (pNum >= 1 && pNum <= 14) {
+          return `${pfx}-${a}-${r}-${s}-${p}`;
+        }
+      }
+    }
+
+    return null;
   };
 
   const generateCode = () => {
