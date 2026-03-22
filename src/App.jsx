@@ -9,13 +9,62 @@ const MAX_FRAMES = 10;
 const KEYWORDS = ["UNKNOWN", "CONSOLIDATION"];
 
 const PALLET_DATA = [
-  { name: "CHEP", color: "#2979FF", colorName: "Blue", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Blue painted wood", "CHEP logo branded on blocks", "Block pallet with 4-way entry", "Most common pooled pallet"] },
-  { name: "LPR", color: "#FF1744", colorName: "Bright Red", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Bright red painted wood", "LPR / La Palette Rouge logo", "Block pallet", "European pool system"] },
-  { name: "IPP", color: "#8B0000", colorName: "Dark Red", type: "Block", dims: "1200×1000mm", material: "Wood", markers: ["Dark red / maroon painted wood", "IPP Logipal branding", "Block pallet", "Darker than LPR"] },
-  { name: "EPS", color: "#8D6E3F", colorName: "Brown Wood", type: "Block", dims: "Various", material: "Wood", markers: ["Natural brown wood", "EPS stamp on blocks", "Unpainted / natural color", "Block style"] },
-  { name: "DPB", color: "#1a1a1a", colorName: "Black Plastic", type: "Block", dims: "Various", material: "Plastic", markers: ["Black plastic", "Lightweight", "Block pallet style", "Durable / washable"] },
-  { name: "BLOCK", color: "#546E7A", colorName: "Various", type: "Block", dims: "Various", material: "Wood", markers: ["Blocks at corners + center", "4-way forklift entry", "Heavier & stronger", "9 blocks total"] },
-  { name: "EURO", color: "#C8A85C", colorName: "Natural Wood", type: "EPAL", dims: "1200×800mm", material: "Wood", markers: ["EPAL/EUR stamp required", "Chamfered edges on blocks", "Narrower than standard (800mm)", "Most common in Europe"] },
+  {
+    name: "CHEP",
+    color: "#2979FF",
+    colorName: "Blue",
+    desc: "The most widely used pooled pallet system. Blue painted, managed by CHEP (Brambles). Returned and reused through the CHEP pool network.",
+    variants: [
+      { size: "Euro", dims: "1200×800mm", material: "Wood", img: "/pallets/chep-euro-wood.jpg" },
+      { size: "Euro", dims: "1200×800mm", material: "Plastic", img: "/pallets/chep-euro-plastic.jpg" },
+      { size: "Block", dims: "1200×1000mm", material: "Wood", img: "/pallets/chep-block-wood.jpg" },
+      { size: "Block", dims: "1200×1000mm", material: "Plastic", img: "/pallets/chep-block-plastic.jpg" },
+    ],
+    markers: ["Blue painted", "CHEP logo on blocks", "4-way entry", "Most common pooled pallet"],
+  },
+  {
+    name: "LPR",
+    color: "#FF1744",
+    colorName: "Bright Red",
+    desc: "La Palette Rouge — bright red pooled pallet. Wooden only. Used across European supply chains.",
+    variants: [
+      { size: "Euro", dims: "1200×800mm", material: "Wood", img: "/pallets/lpr-euro-wood.jpg" },
+      { size: "Block", dims: "1200×1000mm", material: "Wood", img: "/pallets/lpr-block-wood.jpg" },
+    ],
+    markers: ["Bright red paint", "LPR logo", "Wood only", "European pool system"],
+  },
+  {
+    name: "IPP",
+    color: "#8B0000",
+    colorName: "Dark Red",
+    desc: "IPP Logipal — dark red / maroon pooled pallet. Wooden only. Darker than LPR, easy to confuse at a glance.",
+    variants: [
+      { size: "Euro", dims: "1200×800mm", material: "Wood", img: "/pallets/ipp-euro-wood.jpg" },
+      { size: "Block", dims: "1200×1000mm", material: "Wood", img: "/pallets/ipp-block-wood.jpg" },
+    ],
+    markers: ["Dark red / maroon paint", "IPP Logipal branding", "Wood only", "Darker than LPR"],
+  },
+  {
+    name: "EPS",
+    color: "#8D6E3F",
+    colorName: "Beige Wood",
+    desc: "European Pallet System. Natural beige / light brown wood. Unpainted. Identified by EPS stamp on the blocks.",
+    variants: [
+      { size: "Euro", dims: "1200×800mm", material: "Wood", img: "/pallets/eps-euro-wood.jpg" },
+      { size: "Block", dims: "1200×1000mm", material: "Wood", img: "/pallets/eps-block-wood.jpg" },
+    ],
+    markers: ["Natural beige wood", "EPS stamp on blocks", "Unpainted", "Block style"],
+  },
+  {
+    name: "DPB",
+    color: "#1a1a1a",
+    colorName: "Black Plastic",
+    desc: "Düsseldorfer Paletten Block. Black plastic pallet. Only comes in block size. Lightweight, durable, and washable.",
+    variants: [
+      { size: "Block", dims: "1200×1000mm", material: "Plastic", img: "/pallets/dpb-block-plastic.jpg" },
+    ],
+    markers: ["Black plastic", "Block size only", "Lightweight", "Durable / washable"],
+  },
 ];
 
 /* ─── FRAME CODES GENERATOR ─── */
@@ -468,55 +517,148 @@ function CustomQRScreen({ onBack }) {
 }
 
 function PalletScreen({ onBack }) {
-  const [expanded, setExpanded] = useState(null);
+  const [selected, setSelected] = useState(null);
+
+  if (selected !== null) {
+    const p = PALLET_DATA[selected];
+    const clr = p.color === "#1a1a1a" ? "#666" : p.color;
+    return (
+      <div>
+        <BackBar onBack={() => setSelected(null)} title={p.name} accent={clr} />
+        <div style={{ padding: 20 }}>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 14, marginBottom: 16,
+          }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 14,
+              background: `${clr}25`, display: "flex",
+              alignItems: "center", justifyContent: "center",
+              fontFamily: font, fontWeight: 900, fontSize: 20, color: clr,
+            }}>{p.name.slice(0, 3)}</div>
+            <div>
+              <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: C.text }}>{p.name}</div>
+              <div style={{ fontFamily: font, fontSize: 13, color: clr, marginTop: 2 }}>{p.colorName}</div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p style={{
+            fontFamily: font, fontSize: 13, color: "#aaa",
+            lineHeight: 1.6, marginBottom: 20,
+          }}>{p.desc}</p>
+
+          {/* Markers */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
+            {p.markers.map((m, j) => (
+              <span key={j} style={{
+                background: `${clr}15`, border: `1px solid ${clr}35`,
+                color: clr, borderRadius: 8, padding: "6px 14px",
+                fontSize: 12, fontFamily: font, fontWeight: 600,
+              }}>{m}</span>
+            ))}
+          </div>
+
+          {/* Variants */}
+          <div style={{
+            fontSize: 10, color: C.textDim, letterSpacing: 2,
+            fontFamily: font, fontWeight: 700, marginBottom: 12,
+          }}>VARIANTS ({p.variants.length})</div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {p.variants.map((v, vi) => (
+              <div key={vi} style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 14, overflow: "hidden",
+              }}>
+                {/* Image area */}
+                <div style={{
+                  width: "100%", height: 180,
+                  background: `${clr}08`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <img
+                    src={v.img}
+                    alt={`${p.name} ${v.size} ${v.material}`}
+                    style={{
+                      width: "100%", height: "100%",
+                      objectFit: "cover",
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                  <div style={{
+                    display: "none", position: "absolute",
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    alignItems: "center", justifyContent: "center",
+                    flexDirection: "column", gap: 8,
+                  }}>
+                    <PalletIllustration
+                      color={p.color}
+                      material={v.material}
+                      size={100}
+                    />
+                    <div style={{
+                      fontFamily: font, fontSize: 10, color: C.textDim,
+                    }}>Add image: {v.img}</div>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div style={{ padding: "14px 16px" }}>
+                  <div style={{
+                    fontFamily: font, fontWeight: 700, fontSize: 16, color: C.text,
+                  }}>{v.size} — {v.material}</div>
+                  <div style={{
+                    fontFamily: font, fontSize: 12, color: C.textDim, marginTop: 4,
+                  }}>{v.dims}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <BackBar onBack={onBack} title="PALLET GUIDE" accent="#5C6BC0" />
       <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        {PALLET_DATA.map((p, i) => (
-          <button key={p.name} onClick={() => setExpanded(expanded === i ? null : i)} style={{
-            width: "100%", padding: "18px 16px", background: C.surface,
-            border: `1px solid ${C.border}`, borderLeft: `5px solid ${p.color === "#1a1a1a" ? "#444" : p.color}`,
-            borderRadius: 14, cursor: "pointer", textAlign: "left",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 12,
-                background: `${p.color === "#1a1a1a" ? "#222" : p.color}18`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, overflow: "hidden",
-              }}>
-                <PalletIllustration color={p.color} material={p.material} size={52} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: font, fontWeight: 700, fontSize: 17, color: C.text }}>{p.name}</div>
-                <div style={{ fontFamily: font, fontSize: 12, color: C.textDim, marginTop: 2 }}>{p.colorName} · {p.type} · {p.dims}</div>
-              </div>
-              <div style={{
-                color: C.textDim, fontSize: 20,
-                transform: expanded === i ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s",
-              }}>▾</div>
-            </div>
-            {expanded === i && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, padding: "10px 0",
-                  background: `${p.color === "#1a1a1a" ? "#181818" : p.color}08`, borderRadius: 12 }}>
-                  <PalletIllustration color={p.color} material={p.material} size={120} />
+        {PALLET_DATA.map((p, i) => {
+          const clr = p.color === "#1a1a1a" ? "#666" : p.color;
+          return (
+            <button key={p.name} onClick={() => setSelected(i)} style={{
+              width: "100%", padding: "20px 16px", background: C.surface,
+              border: `1px solid ${C.border}`, borderLeft: `5px solid ${clr}`,
+              borderRadius: 14, cursor: "pointer", textAlign: "left",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: 12,
+                  background: `${clr}18`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, overflow: "hidden",
+                }}>
+                  <PalletIllustration color={p.color} material={p.variants[0].material} size={52} />
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {p.markers.map((m, j) => (
-                    <span key={j} style={{
-                      background: `${p.color === "#1a1a1a" ? "#333" : p.color}15`,
-                      border: `1px solid ${p.color === "#1a1a1a" ? "#444" : p.color}35`,
-                      color: p.color === "#1a1a1a" ? "#999" : p.color,
-                      borderRadius: 8, padding: "6px 14px", fontSize: 13, fontFamily: font, fontWeight: 600,
-                    }}>{m}</span>
-                  ))}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: font, fontWeight: 700, fontSize: 17, color: C.text }}>{p.name}</div>
+                  <div style={{ fontFamily: font, fontSize: 12, color: C.textDim, marginTop: 2 }}>
+                    {p.colorName} · {p.variants.map(v => v.size).filter((v, i, a) => a.indexOf(v) === i).join(" + ")}
+                  </div>
+                  <div style={{ fontFamily: font, fontSize: 11, color: `${clr}88`, marginTop: 3 }}>
+                    {p.variants.length} variant{p.variants.length > 1 ? "s" : ""}
+                  </div>
                 </div>
+                <div style={{ color: C.textDim, fontSize: 18 }}>→</div>
               </div>
-            )}
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
