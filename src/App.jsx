@@ -479,9 +479,28 @@ function CustomQRScreen({ onBack }) {
     setScanStatus("Capturing...");
 
     const c = canvasRef.current;
-    c.width = v.videoWidth;
-    c.height = v.videoHeight;
-    c.getContext("2d").drawImage(v, 0, 0);
+    const ctx = c.getContext("2d");
+
+    // Crop to the center region (matching the dashed scan target)
+    // Target is 90% width, ~30% height, centered
+    const cropX = Math.floor(v.videoWidth * 0.05);
+    const cropY = Math.floor(v.videoHeight * 0.30);
+    const cropW = Math.floor(v.videoWidth * 0.90);
+    const cropH = Math.floor(v.videoHeight * 0.40);
+
+    c.width = cropW;
+    c.height = cropH;
+    ctx.drawImage(v, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // Increase contrast for better OCR
+    const imageData = ctx.getImageData(0, 0, cropW, cropH);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const avg = (d[i] + d[i+1] + d[i+2]) / 3;
+      const val = avg > 127 ? 255 : 0;
+      d[i] = val; d[i+1] = val; d[i+2] = val;
+    }
+    ctx.putImageData(imageData, 0, 0);
 
     setScanStatus("Reading text...");
 
