@@ -467,10 +467,17 @@ function CustomQRScreen({ onBack }) {
 
   const captureAndScan = async () => {
     if (!videoRef.current || !canvasRef.current) return;
+
+    const v = videoRef.current;
+    // Make sure video is actually playing and has dimensions
+    if (v.videoWidth === 0 || v.videoHeight === 0 || v.readyState < 2) {
+      setScanStatus("Camera not ready. Wait a moment and try again.");
+      return;
+    }
+
     setScanning(true);
     setScanStatus("Capturing...");
 
-    const v = videoRef.current;
     const c = canvasRef.current;
     c.width = v.videoWidth;
     c.height = v.videoHeight;
@@ -489,6 +496,7 @@ function CustomQRScreen({ onBack }) {
       });
 
       const raw = data.text.trim().toUpperCase();
+      console.log("RAW OCR:", raw);
 
       // Try to extract a valid location code from noisy OCR output
       const result = extractLocationCode(raw);
@@ -503,7 +511,7 @@ function CustomQRScreen({ onBack }) {
           const segments = cleaned.split(/\s+/);
           const codeLike = segments.find(s => s.includes("-") && s.length >= 3) || segments[0] || cleaned;
           setInput(codeLike);
-          setScanStatus("No exact match — edit the code, then tap →");
+          setScanStatus("Raw: " + raw.substring(0, 60));
         } else {
           setScanStatus("No text found. Try again or type manually.");
         }
